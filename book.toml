@@ -1,0 +1,10 @@
+[book]
+authors = ["Your Name"]
+language = "en"
+src = "src"
+title = "The Embedded Rust Kernel"
+
+[output.html]
+additional-css = ["custom.css"]
+git-repository-url = "https://github.com/username/repo"
+site-url = "/book/"
