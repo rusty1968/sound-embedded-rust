@@ -6,6 +6,8 @@
 # Part 1: Verified Dangerous: Mastery of Unsafe Rust
 - [The Contract of Unsafe](unsafe/contract.md)
     - [Undefined Behavior](unsafe/ub.md)
+    - [The Rust Abstract Machine](unsafe/abstract_machine.md)
+    - [Miri & The Abstract Machine](unsafe/miri.md)
     - [The boundary: Safe vs Unsafe](unsafe/boundary.md)
 - [Memory Layout & Pointers](unsafe/memory_layout.md)
     - [Raw Pointers vs References](unsafe/raw_pointers.md)

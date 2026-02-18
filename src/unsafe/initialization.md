@@ -156,3 +156,84 @@ pub fn handle_packet() {
     assert_eq!(packet[1499], 0xAA);
 }
 ```
+
+## Example: Thread Stack Storage
+
+A critical use case in kernels is allocating stack memory for threads.
+
+Technically, a stack is just a chunk of bytes. However, treating it as `[u8; N]` is problematic because of **Pointer Provenance**.
+
+### Why `u8` isn't enough: Provenance
+
+In the Rust Abstract Machine (and modern C/C++ memory models), a pointer is not just a numeric address (e.g., `0x12345678`). It carries "provenance"—secret metadata about which allocation it belongs to.
+
+If you cast a pointer `*const T` to a `usize`, store it in a `u8` array, and then later read it back and cast it to `*const T`, you might lose this provenance information. The compiler might decide that the new pointer is invalid because it can't prove it points to the original object, leading to UB when you dereference it.
+
+`MaybeUninit<u8>` is special. It is guaranteed to be able to hold "raw bytes" of *any* type, preserving their validity and provenance, even if those bytes happen to form part of a pointer. This makes `[MaybeUninit<u8>; N]` the correct type for a bag of memory that might hold return addresses, frame pointers, or other spilled registers.
+
+Here is a robust abstraction for thread stack storage:
+
+```rust
+use core::mem::MaybeUninit;
+
+/// The memory backing a thread's stack before it has been started.
+///
+/// Stacks are aligned to 8 bytes for broad ABI compatibility (e.g., ARM64/x86_64
+/// often require 16-byte alignment, but 8 is the minimum for u64).
+#[repr(align(8))]
+pub struct StackStorage<const N: usize> {
+    // We use MaybeUninit<u8> to preserve pointer provenance and 
+    // allow uninitialized padding bytes.
+    pub stack: [MaybeUninit<u8>; N],
+}
+
+impl<const N: usize> StackStorage<N> {
+    pub const fn new() -> Self {
+        Self {
+            // Create an uninitialized array. 
+            // NOTE: In strict no_std, getting a huge array of MaybeUninit
+            // can be tricky. This specific incantation works on modern Rust.
+            stack: [MaybeUninit::uninit(); N],
+        }
+    }
+}
+
+/// A view into a stack's memory range.
+#[derive(Clone, Copy)]
+pub struct Stack {
+    // Starting (lowest) address of the stack. Inclusive.
+    start: *mut MaybeUninit<u8>,
+    // Ending (highest) address of the stack. Exclusive.
+    end: *mut MaybeUninit<u8>,
+}
+
+impl Stack {
+    pub fn from_storage<const N: usize>(storage: &mut StackStorage<N>) -> Self {
+        let start = storage.stack.as_mut_ptr();
+        // SAFETY: The storage is a valid contiguous array of size N.
+        let end = unsafe { start.add(N) };
+        Self { start, end }
+    }
+
+    /// Initialize the stack with a "canary" pattern.
+    ///
+    /// This is useful for:
+    /// 1. Debugging (seeing how much stack was used).
+    /// 2. Security (avoiding leaking data from previous boots).
+    pub fn paint_stack(&self) {
+        // We cast to u32 for faster 4-byte writes.
+        // SAFETY: We must ensure start/end are aligned to 4 bytes.
+        // StackStorage is align(8), so this is safe.
+        let mut ptr = self.start as *mut u32;
+        let end = self.end as *mut u32;
+
+        // 0xDEADBEEF is a classic stack canary pattern.
+        unsafe {
+            while ptr < end {
+                ptr.write_volatile(0xDEADBEEF);
+                ptr = ptr.add(1);
+            }
+        }
+    }
+}
+```
