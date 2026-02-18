@@ -1,6 +1,10 @@
-# My Markdown Book Repo
+# Sound Embedded Rust
 
-This repository contains the source for "My Markdown Book".
+> **Building a Kernel for the Abstract Machine**
+
+This repository contains the source for the book **"Sound Embedded Rust"**.
+
+It is a rigorous guide to building sound, panic-free embedded operating system kernels in Rust. The book focuses on reasoning about the Rust Abstract Machine, enforcing strict boundaries between safe and unsafe code, and designing robust hardware abstractions that treat datasheets as axioms.
 
 ## Building the Book
 
@@ -39,3 +43,7 @@ This will start a local web server and open your browser. It automatically reloa
 - `src/SUMMARY.md`: The table of contents.
 - `src/*.md`: Chapter content.
 - `book.toml`: Configuration.
+
+## License
+
+This project is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
