@@ -4,7 +4,14 @@
 
 This repository contains the source for the book **"Sound Embedded Rust"**.
 
-It is a rigorous guide to building sound, panic-free embedded operating system kernels in Rust. The book focuses on reasoning about the Rust Abstract Machine, enforcing strict boundaries between safe and unsafe code, and establishing **trust anchors** with hardware by correctly modeling memory-mapped interfaces.
+It is a rigorous guide to building sound, panic-free embedded operating system kernels in Rust. The book focuses on reasoning about the Rust Abstract Machine and enforcing strict boundaries between safe and unsafe code.
+
+Key topics include:
+- **The Abstract Machine**: Understanding Undefined Behavior, Provenance, and Stacked Borrows.
+- **Memory Layout**: Mastering `repr(C)`, alignment, padding, and manual initialization.
+- **Volatile Access**: Correctly modeling memory-mapped I/O (MMIO) and side effects.
+- **Interior Mutability**: Building safe concurrency primitives (`UnsafeCell`) from scratch.
+- **The Hardware Boundary**: Inline assembly, naked functions, and custom entry points.
 
 ## Building the Book
 
