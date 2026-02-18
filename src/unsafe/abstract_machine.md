@@ -4,7 +4,12 @@ When writing embedded systems code, specifically kernels or drivers that interac
 
 This "hardware mental model" is useful for debugging and performance analysis, but it is **insufficient and dangerous** for reasoning about correctness in Rust (or C/C++).
 
-Instead, Rust code executes on an **Abstract Machine (AM)**. The compiler does not translate your source code directly into machine code; it translates your source code into operations on this Abstract Machine. Understanding this layer of abstraction is the key to understanding Undefined Behavior (UB), `unsafe` code, and why the compiler is allowed to optimize your code in ways that might seem surprising.
+Instead, Rust code executes on an **Abstract Machine (AM)**.
+
+> **Note on "The" Abstract Machine**:
+> Rust does not yet have a single, finalized formal specification for its Abstract Machine (unlike C or C++). Even the memory model is a work in progress. When we speak of the "Abstract Machine" in this book, we refer to the **consensus model** used by the Operational Semantics (OpSem) team, enforced by tools like **Miri** (via Stacked Borrows/Tree Borrows), and relied upon for LLVM codegen optimizations. It is a rigorous mental model, even if the ink on the official spec is not yet dry.
+
+The compiler does not translate your source code directly into machine code; it translates your source code into operations on this Abstract Machine. Understanding this layer of abstraction is the key to understanding Undefined Behavior (UB), `unsafe` code, and why the compiler is allowed to optimize your code in ways that might seem surprising.
 
 ## Philosophy: Why an Abstract Machine?
 
@@ -27,12 +32,19 @@ Crucially, if your program violates the rules of the Abstract Machine, the contr
 
 The Rust Abstract Machine tracks more state than a physical CPU does. While a CPU sees bytes in RAM and values in registers, the AM sees *typed values*, *initialization*, and *provenance*.
 
-### 1. Memory (Bytes + Initialization)
-In the Abstract Machine, a byte of memory is not just a value from 0-255. A byte can also be **uninitialized**.
+### 1. Memory (Bytes + Initialization + Validity)
+In the Abstract Machine, a byte of memory is not just a value from 0-255. A byte of memory has two key properties:
+1.  **Definitions**: Is it initialized?
+2.  **Validity**: Does it represent a valid value for its type?
 
-Reading an uninitialized byte on a physical CPU usually just gives you garbage data (whatever was left in that cache line). Reading an uninitialized memory on the Abstract Machine is immediate Undefined Behavior.
+**Uninitialized Memory**: Reading uninitialized memory on a physical CPU usually just gives you garbage data (whatever was left in that cache line). Reading uninitialized memory on the Abstract Machine is immediate Undefined Behavior. `MaybeUninit<T>` exists precisely to handle this state without triggering UB.
 
-This distinction is vital. `MaybeUninit<T>` exists precisely to tell the Abstract Machine, "I know this memory is uninitialized, please don't explode if I merely hold a pointer to it, but I promise not to read the data until I initialize it."
+**Invalid Representations**: Even if memory is initialized, it might be "bit-invalid" for a specific type.
+*   A `bool` must be `0x00` or `0x01`.
+*   A `&T` reference must never be NULL.
+*   An `enum` must match one of its defined discriminants.
+
+If you transmute `3u8` into a `bool`, you have created an invalid value. The Abstract Machine considers this UB immediately, even if you never use the value.
 
 ### 2. Pointer Values (Address + Provenance)
 To a CPU, a pointer is just an integer—a 32-bit or 64-bit number representing a spot in memory. You can do arithmetic on it, cast it to an integer, and cast it back.
@@ -48,8 +60,23 @@ To the Abstract Machine, a pointer is **Address + Provenance**.
 On hardware: Yes, it's just an address.
 On the Abstract Machine: **No**. The pointer's provenance is still "tied" to `x`. Accessing `y` through a pointer with `x`'s provenance is UB. This rule allows the compiler to assume that pointers to different allocations do not alias, enabling aggressive optimization (similar to `restrict` in C).
 
+*(Note: If you work with low-level kernel structures where pointers must travel through pure `usize` (e.g., in a page table entry), you must use "Exposed Provenance" APIs like [`core::ptr::from_exposed_addr`](https://doc.rust-lang.org/core/ptr/fn.from_exposed_addr.html).)*
+
+```rust
+use core::ptr::{from_exposed_addr, addr_of};
+
+let x: i32 = 0;
+// Converts pointer to address and "exposes" it to the world
+let addr = addr_of!(x) as usize; 
+
+// Reconstruct a pointer with exposed provenance if you really must
+let p = from_exposed_addr::<i32>(addr);
+// Warning: This is an advanced escape hatch. 
+// Do not use this unless you understand the performance implications.
+```
+
 ### 3. The Borrow Stack (Stacked Borrows / Tree Borrows)
-This is the most strictly "Rust" part of the Abstract Machine. To enforce the rules of references (`&mut T` must be exclusive, `&T` must be shared-read-only), the AM maintains a shadow stack of permissions for every location in memory.
+This is the most strictly "Rust" part of the Abstract Machine. To enforce the rules of references (`&mut T` must be exclusive, `&T` must be shared-read-only), tools like Miri use models like **Stacked Borrows** (the current default) or **Tree Borrows** (an experimental alternative proposal). These are not yet fully standardized in the language spec, but they are the de facto models used to reason about aliasing.
 
 Every time you create a reference, the AM pushes a new "permission item" onto the stack for that memory location.
 *   **Accessing memory** requires the tag associated with your pointer to be live in the stack.
@@ -65,8 +92,8 @@ The execution of a Rust program is a sequence of operations on this state.
 Every read or write is checked against the current state:
 1.  **Alignment check**: Is the pointer aligned?
 2.  **Initialization check**: (For reads) Is the memory initialized?
-3.  **Permission check**: Does this pointer have the authority to access this memory based on the Borrow Stack?
-4.  **Provenance check**: Does this pointer have the authority to access this memory based on the Borrow Stack?
+3.  **Provenance check**: Does this pointer have the authority to access this *allocation* (e.g., is it within the bounds of the original object it derived from)?
+4.  **Permission check**: Does this pointer have the current *borrowing authority* to access this memory (i.e., is its tag live in the Borrow Stack for this specific operation)?
 
 ### Retagging
 "Retagging" is an operation that happens implicitly when you create specific references or cast pointers. When you do `let y = &mut *x;`, you aren't just copying an address. The Abstract Machine is **retagging**: it generates a new unique ID (tag) for `y`, pushes it onto the permission stack for that memory, and establishes `y` as the current active owner.
