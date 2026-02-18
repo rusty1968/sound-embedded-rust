@@ -1,6 +1,6 @@
-# The Embedded Rust Kernel
+# Sound Embedded Rust
 
-> **Use the Unsafe to build the Safe.**
+> **Building a Kernel for the Abstract Machine**
 
 This book is a comprehensive guide to designing and implementing a small, real-time operating system (RTOS) kernel for microcontrollers using the Rust programming language.
 

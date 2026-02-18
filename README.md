@@ -4,7 +4,7 @@
 
 This repository contains the source for the book **"Sound Embedded Rust"**.
 
-It is a rigorous guide to building sound, panic-free embedded operating system kernels in Rust. The book focuses on reasoning about the Rust Abstract Machine, enforcing strict boundaries between safe and unsafe code, and designing robust hardware abstractions that treat datasheets as axioms.
+It is a rigorous guide to building sound, panic-free embedded operating system kernels in Rust. The book focuses on reasoning about the Rust Abstract Machine, enforcing strict boundaries between safe and unsafe code, and establishing **trust anchors** with hardware by correctly modeling memory-mapped interfaces.
 
 ## Building the Book
 

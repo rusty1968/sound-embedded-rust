@@ -1,6 +1,6 @@
 # Summary
 
-- [The Embedded Rust Kernel](README.md)
+- [Sound Embedded Rust](README.md)
 - [Introduction](introduction.md)
 
 # Part 1: Verified Dangerous: Mastery of Unsafe Rust

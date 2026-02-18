@@ -1,8 +1,9 @@
 [book]
-authors = ["Your Name"]
+authors = ["rusty1968"]
 language = "en"
 src = "src"
-title = "The Embedded Rust Kernel"
+title = "Sound Embedded Rust: Building a Kernel for the Abstract Machine"
+description = "A rigorous guide to building sound, panic-free embedded operating system kernels in Rust. Learn to reason about the Abstract Machine, strictly separate safe and unsafe code, and design robust hardware abstractions."
 
 [output.html]
 additional-css = ["custom.css"]
